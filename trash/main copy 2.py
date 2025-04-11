@@ -36,15 +36,14 @@ active_tabs = [
     {'id': 'outcomes', 'position': 24, 'hidden': True},
     {'id': 'context_external_tool_167', 'position': 25, 'hidden': True},
     {'id': 'context_external_tool_1815', 'position': 26, 'hidden': True},
-    {'id': 'search', 'position': 27, 'hidden': True},
 ]
 
 st.set_page_config(page_title="Organizador de pestañas", layout="wide", page_icon="⛑️")
-st.title('Organizador de pestañas de cursos 👩‍🎓')
-st.write(f'Es una herramienta diseñada para organizar de manera masiva las pestañas de navegación de los :green[Cursos de Diplomados y Magisteres] en un formato estándar. Esto permite que las supervisoras de proyecto puedan acceder de forma más intuitiva y sencilla a las secciones de sus cursos, garantizando uniformidad y mejorando la experiencia de uso.')
+st.title('Organizeitor de Diplomados 👩‍🎓')
+st.write(f'Es una herramienta diseñada para organizar de manera masiva las pestañas de navegación de los :green[cursos de diplomados] en un formato estándar. Esto permite que las supervisoras de proyecto puedan acceder de forma más intuitiva y sencilla a las secciones de sus cursos, garantizando uniformidad y mejorando la experiencia de uso.')
 course_ids_input = st.text_area('Ingresa los IDs de uno o mas cursos separados por coma o espacio')
 
-if st.button('Reordenar Pestañas'):
+if st.button('Ordenar pestañas'):
     # Separar y limpiar los IDs ingresados
     course_ids = re.split(r'[,\s]+', course_ids_input.strip())
     course_ids = [cid for cid in course_ids if cid]
@@ -54,16 +53,12 @@ if st.button('Reordenar Pestañas'):
     else:
         progress_bar = st.progress(0)
         total_courses = len(course_ids)
-        current_course = 0
-        status_text = st.empty()
-        status_text_tab = st.empty()
-        error_messages = []
-
+        errors = 0
+        good_ones = 0
         for idx, course_id in enumerate(course_ids):
             try:
                 course = canvas.get_course(course_id)
-                current_course += 1
-                status_text.text(f'Procesando curso {current_course}/{total_courses}:  {course.name} (ID: {course_id})')
+                st.write(f'Procesando curso: {course.name} (ID: {course_id})')
 
                 # Obtener las pestañas actuales del curso
                 current_tabs = course.get_tabs()
@@ -72,36 +67,27 @@ if st.button('Reordenar Pestañas'):
                 # Actualizar pestañas según la configuración
                 for tab_info in active_tabs:
                     tab_id = tab_info['id']
-                    hidden = tab_info.get('hidden', None)
+                    hidden = tab_info.get('hidden', False)
                     position = tab_info.get('position', None)
-                    status_text_tab.text(f"Actualizando '{tab_id}'")
+
                     if tab_id in tabs_dict:
                         tab = tabs_dict[tab_id]
-                        update_params = {}
-                        if hidden is not None:
-                            update_params['hidden'] = hidden
+                        update_params = {'hidden': hidden}
                         if position:
                             update_params['position'] = position
                         tab.update(**update_params)
+                        # st.write(f"Pestaña '{tab.label}' actualizada.")
+                        good_ones += 1
                     else:
-                        # por si necesito guardar los ids de pestañas no encontradas
-                        pass
+                        st.write(f"Pestaña '{tab_id}' no encontrada en el curso.")
+                        errors += 1
 
                 # Actualizar la barra de progreso
-                status_text_tab.text('')
-                progress = (idx + 1) / total_courses
-                progress_bar.progress(progress)
+                progress_bar.progress((idx + 1) / total_courses)
             except Exception as e:
-                error_message = f'Error al procesar el curso ID {course_id}: {e}'
-                error_messages.append(error_message)
-                st.error(error_message)
+                st.error(f'Error al procesar el curso ID {course_id}: {e}')
 
-        progress_bar.progress(1.0)
-
-        # Mostrar mensajes de error al final, si los hay
-        if error_messages:
-            st.subheader('❌ Resumen de Errores (Contacta a Marcelo):')
-            for msg in error_messages:
-                st.write(msg)
+        if errors == 0:
+            st.success(f'Proceso completado sin errores ✔️ ({good_ones} pestañas ordenadas)')
         else:
-            status_text.text('✔️ Proceso completado sin errores! - Revisar')
+            st.error(f'Proceso completado pero con fallas ❌ ({errors} pestañas con problemas)')
