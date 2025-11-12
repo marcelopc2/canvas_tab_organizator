@@ -19,6 +19,21 @@ active_tabs = [
     {'id': 'context_external_tool_1342', 'position': 6}, # Nuevas analíticas
 ]
 
+hidden_priority_tabs = [
+    {'id': 'assignments'},     
+    {'id': 'quizzes'},         
+    {'id': 'files'},  
+    {'id': 'announcements'},        
+    {'id': 'pages'}, 
+    {'id': 'rubrics'},          
+    {'id': 'syllabus'}, 
+    {'id': 'discussions'},
+    {'id': 'collaborations'},     
+    {'id': 'outcomes'},
+    {'id': 'search'},
+    {'id': 'grades'},        
+]
+
 untouchable_tabs = ['home', 'settings']
 
 # Función para procesar un curso individual
@@ -28,9 +43,8 @@ def process_course(course_id):
         course = canvas.get_course(course_id)
         current_tabs = course.get_tabs()
         tabs_dict = {tab.id: tab for tab in current_tabs}
-        active_tab_ids = [t['id'] for t in active_tabs]
 
-        # Activar pestañas deseadas
+        # 1) Activar y posicionar las pestañas "activas"
         for tab_info in active_tabs:
             tab_id = tab_info['id']
             position = tab_info['position']
@@ -44,13 +58,33 @@ def process_course(course_id):
             else:
                 local_errors.append(f"[Curso {course_id}] ❌ Pestaña no encontrada: {tab_id}")
 
-        # Ocultar todas las demás (excepto intocables)
-        for tab_id, tab in tabs_dict.items():
-            if tab_id not in active_tab_ids and tab_id not in untouchable_tabs:
+        # 2) Posicionar pestañas ocultas importantes sin mostrarlas
+        #    Las ponemos después de las activas para evitar colisiones.
+        base_pos = (max([t['position'] for t in active_tabs]) if active_tabs else 0) + 1
+        for offset, tab_info in enumerate(hidden_priority_tabs):
+            tab_id = tab_info['id']
+            desired_pos = base_pos + offset
+            if tab_id in tabs_dict:
                 try:
+                    # Importante: las dejamos ocultas pero ordenadas
+                    tabs_dict[tab_id].update(hidden=True, position=desired_pos)
+                except Exception as e:
+                    local_errors.append(f"[Curso {course_id}] ⚠️ No se pudo ordenar (oculta) '{tab_id}': {e}")
+            # Si no existe en el curso, simplemente la ignoramos (no error visible)
+
+        # 3) Mantener política de ocultar el resto (sin tocar su posición)
+        active_tab_ids = [t['id'] for t in active_tabs]
+        priority_hidden_ids = [t['id'] for t in hidden_priority_tabs]
+        for tab_id, tab in tabs_dict.items():
+            if tab_id in untouchable_tabs:
+                continue
+            if tab_id not in active_tab_ids and tab_id not in priority_hidden_ids:
+                try:
+                    # solo ocultamos (no tocamos position => quedan en el orden que estén)
                     tab.update(hidden=True)
                 except Exception as e:
                     local_errors.append(f"[Curso {course_id}] ⚠️ No se pudo ocultar '{tab_id}': {e}")
+
     except Exception as e:
         local_errors.append(f"❗ Error al procesar el curso ID {course_id}: {e}")
     return local_errors
@@ -70,6 +104,7 @@ st.markdown("""
 - ✅ Se agregó **Nuevas Analíticas** (`/external_tools/1342`)
 - ❌ Se quitó la pestaña **Calificaciones**
 - 🚀 Se activó el procesamiento paralelo (multi-núcleo) para mayor velocidad
+- ✅ Se Agrego un orden estándar a las pestañas ocultas (12-11-2025).
 """)
 
 course_ids_input = st.text_area('Ingresa los IDs de uno o más cursos separados por coma o espacio')
